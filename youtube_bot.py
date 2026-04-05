@@ -2,15 +2,12 @@ import os
 import time
 import random
 import logging
-from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -38,7 +35,7 @@ class YouTubeBot:
         return random.choice(user_agents)
     
     def create_driver(self):
-        """Create Chrome driver with proper version matching"""
+        """Create Chrome driver"""
         options = Options()
         
         # Random user agent
@@ -61,9 +58,8 @@ class YouTubeBot:
             "profile.default_content_setting_values.notifications": 2
         })
         
-        # Create driver with automatic version management
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
+        # Use Chrome from system path
+        driver = webdriver.Chrome(options=options)
         
         # Remove webdriver property
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
