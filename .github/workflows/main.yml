@@ -1,4 +1,4 @@
-name: 🚀 AI Traffic Engine v6.1
+name: ?? AI Traffic Engine v6.1
 
 on:
   schedule:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   traffic-bot:
-    name: 🌐 Smart Traffic Simulation
+    name: ?? Smart Traffic Simulation
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -19,13 +19,13 @@ jobs:
       # ==============================
       # 1. Checkout
       # ==============================
-      - name: 📥 Checkout Repository
+      - name: ?? Checkout Repository
         uses: actions/checkout@v4
 
       # ==============================
       # 2. Python Setup
       # ==============================
-      - name: 🐍 Setup Python
+      - name: ?? Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -33,7 +33,7 @@ jobs:
       # ==============================
       # 3. Cache (Speed Boost)
       # ==============================
-      - name: ⚡ Cache pip
+      - name: ?? Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -44,7 +44,7 @@ jobs:
       # ==============================
       # 4. Install Dependencies
       # ==============================
-      - name: 📦 Install Dependencies
+      - name: ?? Install Dependencies
         run: |
           pip install --upgrade pip
           pip install \
@@ -59,13 +59,13 @@ jobs:
       # ==============================
       # 5. Install Playwright Browsers
       # ==============================
-      - name: 🌍 Install Playwright Browsers
+      - name: ?? Install Playwright Browsers
         run: playwright install --with-deps
 
       # ==============================
       # 6. Generate Queries
       # ==============================
-      - name: 🤖 Generate Search Queries
+      - name: ?? Generate Search Queries
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
@@ -76,7 +76,7 @@ jobs:
       # ==============================
       # 7. Run Traffic (Xvfb Enabled)
       # ==============================
-      - name: 🚦 Execute Traffic Simulation (Xvfb)
+      - name: ?? Execute Traffic Simulation (Xvfb)
         run: |
           echo "::group::Traffic Execution"
 
@@ -97,19 +97,19 @@ jobs:
       # ==============================
       # 8. Performance Report
       # ==============================
-      - name: 📊 Performance Report
+      - name: ?? Performance Report
         run: |
-          echo "## 🚀 Traffic Run Report" >> $GITHUB_STEP_SUMMARY
-          echo "- 🕒 Run Time: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔁 Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- 🧠 Queries Generated: $(wc -l < search_queries.txt || echo 0)" >> $GITHUB_STEP_SUMMARY
-          echo "- 💻 Runner: ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "## ?? Traffic Run Report" >> $GITHUB_STEP_SUMMARY
+          echo "- ?? Run Time: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+          echo "- ?? Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ?? Queries Generated: $(wc -l < search_queries.txt || echo 0)" >> $GITHUB_STEP_SUMMARY
+          echo "- ?? Runner: ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ? Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
 
       # ==============================
       # 9. Upload Artifacts
       # ==============================
-      - name: 📁 Upload Logs
+      - name: ?? Upload Logs
         uses: actions/upload-artifact@v4
         with:
           name: traffic-logs
