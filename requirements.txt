@@ -5,3 +5,4 @@ gdown
 playwright
 beautifulsoup4
 requests
+undetected-chromedriver
