@@ -1,9 +1,9 @@
-name: 🚀 AI Traffic Engine v6.0
+name: 🚀 AI Traffic Engine v6.1
 
 on:
   schedule:
-    - cron: "*/30 * * * *"  # every 30 minutes
-  workflow_dispatch:        # manual trigger
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch:         # manual trigger
 
 env:
   PYTHONUNBUFFERED: 1
@@ -17,13 +17,13 @@ jobs:
 
     steps:
       # ==============================
-      # 1. Checkout repo
+      # 1. Checkout
       # ==============================
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
       # ==============================
-      # 2. Setup Python
+      # 2. Python Setup
       # ==============================
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
@@ -31,7 +31,7 @@ jobs:
           python-version: "3.11"
 
       # ==============================
-      # 3. Cache dependencies (FAST)
+      # 3. Cache (Speed Boost)
       # ==============================
       - name: ⚡ Cache pip
         uses: actions/cache@v4
@@ -42,7 +42,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       # ==============================
-      # 4. Install dependencies
+      # 4. Install Dependencies
       # ==============================
       - name: 📦 Install Dependencies
         run: |
@@ -57,13 +57,13 @@ jobs:
             requests
 
       # ==============================
-      # 5. Install Playwright browsers
+      # 5. Install Playwright Browsers
       # ==============================
       - name: 🌍 Install Playwright Browsers
         run: playwright install --with-deps
 
       # ==============================
-      # 6. Generate AI Queries
+      # 6. Generate Queries
       # ==============================
       - name: 🤖 Generate Search Queries
         env:
@@ -74,14 +74,19 @@ jobs:
           echo "::endgroup::"
 
       # ==============================
-      # 7. Run Traffic Simulator
+      # 7. Run Traffic (Xvfb Enabled)
       # ==============================
-      - name: 🚦 Execute Traffic Simulation
+      - name: 🚦 Execute Traffic Simulation (Xvfb)
         run: |
           echo "::group::Traffic Execution"
+
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
           START=$(date +%s)
 
-          python executor.py
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            python executor.py
 
           END=$(date +%s)
           DURATION=$((END - START))
@@ -102,12 +107,11 @@ jobs:
           echo "- ✅ Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
 
       # ==============================
-      # 9. Upload Logs (Optional)
+      # 9. Upload Artifacts
       # ==============================
-      - name: 📁 Upload Artifacts
+      - name: 📁 Upload Logs
         uses: actions/upload-artifact@v4
         with:
           name: traffic-logs
-          path: |
-            search_queries.txt
+          path: search_queries.txt
           retention-days: 3
