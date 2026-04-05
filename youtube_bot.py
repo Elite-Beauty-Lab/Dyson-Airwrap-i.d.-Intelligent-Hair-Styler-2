@@ -29,7 +29,6 @@ class ChromeProfileManager:
 
     def download_profile_from_drive(self) -> bool:
         try:
-            # Try to import gdown, if not available skip
             try:
                 import gdown
             except ImportError:
@@ -40,7 +39,6 @@ class ChromeProfileManager:
             self.logger.info("⏳ Downloading profile from Drive...")
             gdown.download_folder(url, output=self.config.local_profile_path, quiet=False, use_cookies=False)
 
-            # Verify History exists
             history_file = Path(self.config.local_profile_path) / "History"
             if history_file.exists():
                 self.logger.info(f"✅ Profile verified. History size: {history_file.stat().st_size / 1024 / 1024:.2f} MB")
@@ -68,28 +66,27 @@ class YouTubeBot:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 Version/16.0 Mobile/15E148 Safari/604.1",
-            "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 Chrome/119.0.0.0 Mobile Safari/537.36"
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 Version/16.0 Mobile/15E148 Safari/604.1"
         ]
         return random.choice(user_agents)
     
     def create_driver(self):
-        """Create undetected Chrome driver with random user agent"""
-        # Create fresh options each time
+        """Create undetected Chrome driver with version handling"""
+        # Create fresh options
         options = uc.ChromeOptions()
         
         # Add user agent
         options.add_argument(f'--user-agent={self.get_random_user_agent()}')
         
-        # Basic options
+        # Basic options for GitHub Actions
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--headless=new')  # Use new headless mode
+        options.add_argument('--disable-blink-features=AutomationControlled')
         
         # Random window size
-        if random.choice(['desktop', 'mobile']) == 'mobile':
-            options.add_argument('--window-size=375,812')
-        else:
-            options.add_argument('--window-size=1366,768')
+        options.add_argument('--window-size=1366,768')
         
         # Use real profile if exists
         profile_default = os.path.join(self.profile_path, "Default")
@@ -98,11 +95,26 @@ class YouTubeBot:
             options.add_argument('--profile-directory=Default')
             logger.info(f"Using profile from: {self.profile_path}")
         
-        # Create driver
-        driver = uc.Chrome(options=options)
+        # Try to create driver with automatic version detection
+        try:
+            # Let undetected-chromedriver handle version automatically
+            driver = uc.Chrome(options=options, use_subprocess=True)
+        except Exception as e:
+            logger.warning(f"First attempt failed: {e}")
+            try:
+                # Try without subprocess
+                driver = uc.Chrome(options=options, use_subprocess=False)
+            except Exception as e2:
+                logger.warning(f"Second attempt failed: {e2}")
+                # Final attempt with headless mode
+                options.add_argument('--headless')
+                driver = uc.Chrome(options=options)
         
         # Remove webdriver property
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        try:
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        except:
+            pass
         
         return driver
     
@@ -110,10 +122,10 @@ class YouTubeBot:
         """Random mouse movement"""
         try:
             action = ActionChains(self.driver)
-            x = random.randint(-200, 200)
-            y = random.randint(-100, 100)
+            x = random.randint(-100, 100)
+            y = random.randint(-50, 50)
             action.move_by_offset(x, y).perform()
-            time.sleep(random.uniform(0.2, 0.5))
+            time.sleep(random.uniform(0.1, 0.3))
             action.move_by_offset(-x, -y).perform()
         except:
             pass
@@ -172,39 +184,31 @@ class YouTubeBot:
             except:
                 pass
             
-            if total_seconds > 0 and total_seconds < 1800:  # Less than 30 min
+            if total_seconds > 0 and total_seconds < 1800:
                 watch_time = int(total_seconds * (duration_percent / 100))
                 watch_time = min(watch_time, total_seconds - 5)
                 logger.info(f"Watching {duration_percent}% ({watch_time}s of {total_seconds}s)")
             else:
-                watch_time = random.randint(45, 90)
+                watch_time = random.randint(30, 60)
                 logger.info(f"Watching {watch_time} seconds (fallback)")
             
             # Click play if needed
             try:
                 play_button = self.driver.find_element(By.CSS_SELECTOR, ".ytp-play-button")
-                if play_button and "ytp-play-button" in play_button.get_attribute("class"):
+                if play_button:
                     play_button.click()
                     time.sleep(1)
             except:
                 pass
             
             # Watch video
-            elapsed = 0
-            while elapsed < watch_time:
-                sleep_time = min(random.randint(8, 12), watch_time - elapsed)
-                time.sleep(sleep_time)
-                elapsed += sleep_time
-                
-                # Random interactions
-                if random.random() < 0.2:
-                    self.random_mouse_move()
+            time.sleep(min(watch_time, 60))  # Cap at 60 seconds for headless mode
             
             return True
                 
         except Exception as e:
             logger.error(f"Watch error: {e}")
-            time.sleep(random.randint(30, 60))
+            time.sleep(random.randint(20, 40))
             return False
     
     def run_cycle(self):
@@ -249,15 +253,12 @@ class YouTubeBot:
                     
                     # Random scroll and mouse movement
                     self.scroll_page(random.randint(2, 3))
-                    self.random_mouse_move()
                     
                     # Click and watch random video for 5 seconds
                     try:
-                        videos = WebDriverWait(self.driver, 5).until(
-                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "#video-title"))
-                        )
+                        videos = self.driver.find_elements(By.CSS_SELECTOR, "#video-title")
                         if videos:
-                            random_video = random.choice(videos[:8])
+                            random_video = random.choice(videos[:5])
                             random_video.click()
                             logger.info("▶️ Watching random video for 5 seconds")
                             time.sleep(5)
@@ -300,7 +301,6 @@ def main():
     ╚══════════════════════════════════════════════════════════════╝
     """)
     
-    # Try to download profile (optional)
     manager = ChromeProfileManager()
     profile_exists = manager.download_profile_from_drive()
     
@@ -309,7 +309,6 @@ def main():
     else:
         print("⚠️ Running without Chrome profile")
     
-    # Initialize and run bot
     bot = YouTubeBot(profile_path=manager.config.local_profile_path)
     bot.run()
 
