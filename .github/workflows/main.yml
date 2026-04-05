@@ -1,117 +1,66 @@
-name: ?? AI Traffic Engine v6.1
+import undetected_chromedriver as uc
+from selenium_stealth import stealth
+import time
+import random
+import os
 
-on:
-  schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
-  workflow_dispatch:         # manual trigger
+def start_bot():
+    options = uc.ChromeOptions()
+    
+    # إعدادات أساسية لتجنب الكشف
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--window-size=1920,1080')
+    
+    # (اختياري) إضافة بروكسي إذا توفر
+    proxy = os.getenv("PROXY")
+    if proxy:
+        options.add_argument(f'--proxy-server={proxy}')
 
-env:
-  PYTHONUNBUFFERED: 1
-  TZ: "UTC"
+    driver = uc.Chrome(options=options, headless=False) # Headless False لأننا نستخدم xvfb
 
-jobs:
-  traffic-bot:
-    name: ?? Smart Traffic Simulation
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # تطبيق تقنية Stealth لإخفاء بصمة الأتمتة
+    stealth(driver,
+        languages=["en-US", "en"],
+        vendor="Google Inc.",
+        platform="Win32",
+        webgl_vendor="Intel Inc.",
+        renderer="Intel Iris OpenGL Engine",
+        fix_hairline=True,
+    )
 
-    steps:
-      # ==============================
-      # 1. Checkout
-      # ==============================
-      - name: ?? Checkout Repository
-        uses: actions/checkout@v4
+    try:
+        # 1. انتظار عشوائي قبل الدخول (تجنب البداية المتزامنة)
+        initial_wait = random.randint(5, 45)
+        print(f"Waiting {initial_wait}s before starting...")
+        time.sleep(initial_wait)
 
-      # ==============================
-      # 2. Python Setup
-      # ==============================
-      - name: ?? Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+        # 2. التوجه للفيديو
+        video_url = os.getenv("TARGET_URL", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        driver.get(video_url)
+        print(f"Watching: {video_url}")
 
-      # ==============================
-      # 3. Cache (Speed Boost)
-      # ==============================
-      - name: ?? Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/*.py') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+        # 3. محاكاة التفاعل البشري (Scroll & Random Movements)
+        watch_duration = random.randint(300, 600) # مشاهدة بين 5 لـ 10 دقائق
+        start_time = time.time()
+        
+        while time.time() - start_time < watch_duration:
+            # التمرير لأسفل (لرؤية التعليقات) ثم للأعلى
+            scroll_amount = random.randint(200, 500)
+            driver.execute_script(f"window.scrollBy(0, {scroll_amount});")
+            time.sleep(random.randint(5, 15))
+            driver.execute_script(f"window.scrollBy(0, -{scroll_amount});")
+            
+            # حركة ماوس عشوائية وهمية
+            print(f"Bot interacting... Time left: {int(watch_duration - (time.time() - start_time))}s")
+            time.sleep(random.randint(20, 40))
 
-      # ==============================
-      # 4. Install Dependencies
-      # ==============================
-      - name: ?? Install Dependencies
-        run: |
-          pip install --upgrade pip
-          pip install \
-            groq \
-            selenium \
-            webdriver-manager \
-            gdown \
-            playwright \
-            beautifulsoup4 \
-            requests
+        print("Watch session completed successfully.")
 
-      # ==============================
-      # 5. Install Playwright Browsers
-      # ==============================
-      - name: ?? Install Playwright Browsers
-        run: playwright install --with-deps
+    except Exception as e:
+        print(f"Error occurred: {e}")
+    finally:
+        driver.quit()
 
-      # ==============================
-      # 6. Generate Queries
-      # ==============================
-      - name: ?? Generate Search Queries
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: |
-          echo "::group::AI Query Generation"
-          python generator.py > search_queries.txt
-          echo "::endgroup::"
-
-      # ==============================
-      # 7. Run Traffic (Xvfb Enabled)
-      # ==============================
-      - name: ?? Execute Traffic Simulation (Xvfb)
-        run: |
-          echo "::group::Traffic Execution"
-
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-
-          START=$(date +%s)
-
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-            python executor.py
-
-          END=$(date +%s)
-          DURATION=$((END - START))
-
-          echo "DURATION=$DURATION" >> $GITHUB_ENV
-          echo "::endgroup::"
-
-      # ==============================
-      # 8. Performance Report
-      # ==============================
-      - name: ?? Performance Report
-        run: |
-          echo "## ?? Traffic Run Report" >> $GITHUB_STEP_SUMMARY
-          echo "- ?? Run Time: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
-          echo "- ?? Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ?? Queries Generated: $(wc -l < search_queries.txt || echo 0)" >> $GITHUB_STEP_SUMMARY
-          echo "- ?? Runner: ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ? Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
-
-      # ==============================
-      # 9. Upload Artifacts
-      # ==============================
-      - name: ?? Upload Logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: traffic-logs
-          path: search_queries.txt
-          retention-days: 3
+if __name__ == "__main__":
+    start_bot()
