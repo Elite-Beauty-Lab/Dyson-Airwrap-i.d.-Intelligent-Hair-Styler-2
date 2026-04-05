@@ -1,8 +1,8 @@
 groq
-selenium
 webdriver-manager
 gdown
 playwright
 beautifulsoup4
 requests
-undetected-chromedriver
+selenium==4.15.0
+webdriver-manager==4.0.1
