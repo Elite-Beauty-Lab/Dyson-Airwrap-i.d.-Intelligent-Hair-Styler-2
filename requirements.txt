@@ -1,0 +1,7 @@
+groq
+selenium
+webdriver-manager
+gdown
+playwright
+beautifulsoup4
+requests
