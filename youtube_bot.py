@@ -29,7 +29,13 @@ class ChromeProfileManager:
 
     def download_profile_from_drive(self) -> bool:
         try:
-            import gdown
+            # Try to import gdown, if not available skip
+            try:
+                import gdown
+            except ImportError:
+                self.logger.warning("⚠️ gdown not installed, skipping profile download")
+                return False
+                
             url = f"https://drive.google.com/drive/folders/{self.config.folder_id}"
             self.logger.info("⏳ Downloading profile from Drive...")
             gdown.download_folder(url, output=self.config.local_profile_path, quiet=False, use_cookies=False)
@@ -71,15 +77,13 @@ class YouTubeBot:
         options = uc.ChromeOptions()
         
         # Use real Chrome profile if exists
-        if os.path.exists(self.profile_path):
+        if os.path.exists(self.profile_path) and os.path.exists(os.path.join(self.profile_path, "Default")):
             options.add_argument(f"--user-data-dir={self.profile_path}")
             options.add_argument("--profile-directory=Default")
             logger.info(f"Using real Chrome profile from: {self.profile_path}")
         
         options.add_argument(f'--user-agent={self.get_random_user_agent()}')
         options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--start-maximized')
@@ -89,8 +93,12 @@ class YouTubeBot:
             options.add_argument('--window-size=375,812')
         else:
             options.add_argument('--window-size=1920,1080')
-            
-        self.driver = uc.Chrome(options=options)
+        
+        # Version-specific fix for undetected-chromedriver
+        try:
+            self.driver = uc.Chrome(options=options, version_main=120)
+        except:
+            self.driver = uc.Chrome(options=options)
         
         # Remove webdriver property
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -109,8 +117,11 @@ class YouTubeBot:
         except:
             pass
     
-    def scroll_page(self, times=random.randint(2, 5)):
+    def scroll_page(self, times=None):
         """Natural scrolling"""
+        if times is None:
+            times = random.randint(2, 5)
+        
         for _ in range(times):
             scroll = random.randint(300, 800)
             self.driver.execute_script(f"window.scrollBy(0, {scroll});")
@@ -147,7 +158,9 @@ class YouTubeBot:
             # Try to get video duration
             total_seconds = 0
             try:
-                duration_elem = self.driver.find_element(By.CSS_SELECTOR, ".ytp-time-duration")
+                duration_elem = WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".ytp-time-duration"))
+                )
                 if duration_elem:
                     duration_text = duration_elem.text
                     parts = duration_text.split(':')
@@ -158,7 +171,7 @@ class YouTubeBot:
             except:
                 pass
             
-            if total_seconds > 0:
+            if total_seconds > 0 and total_seconds < 3600:  # Less than 1 hour
                 watch_time = int(total_seconds * (duration_percent / 100))
                 watch_time = min(watch_time, total_seconds - 5)
                 logger.info(f"Watching {duration_percent}% ({watch_time}s of {total_seconds}s)")
@@ -172,6 +185,7 @@ class YouTubeBot:
                 play_button = self.driver.find_element(By.CSS_SELECTOR, ".ytp-play-button")
                 if "ytp-play-button" in play_button.get_attribute("class"):
                     play_button.click()
+                    time.sleep(1)
             except:
                 pass
             
@@ -197,11 +211,13 @@ class YouTubeBot:
     
     def run_cycle(self):
         """Run one complete cycle of the bot"""
+        driver = None
         try:
             # Create new driver with random user agent and real profile
             logger.info("Starting YouTube bot...")
-            self.driver = self.create_driver()
-            self.driver.get("https://www.youtube.com")
+            driver = self.create_driver()
+            self.driver = driver
+            driver.get("https://www.youtube.com")
             time.sleep(random.uniform(3, 5))
             
             # First random search
@@ -212,7 +228,7 @@ class YouTubeBot:
             
             # Go to target video
             logger.info("Navigating to target video")
-            self.driver.get(self.target_url)
+            driver.get(self.target_url)
             time.sleep(random.uniform(3, 5))
             
             # Watch videos with different percentages
@@ -225,7 +241,7 @@ class YouTubeBot:
                 if i < len(self.view_percentages) - 1:  # Not last cycle
                     # Go to YouTube home
                     logger.info("Going to YouTube home")
-                    self.driver.get("https://www.youtube.com")
+                    driver.get("https://www.youtube.com")
                     time.sleep(random.uniform(2, 4))
                     
                     # Search for "google"
@@ -238,18 +254,18 @@ class YouTubeBot:
                     
                     # Click and watch random video for 5 seconds
                     try:
-                        videos = self.driver.find_elements(By.CSS_SELECTOR, "#video-title")
+                        videos = driver.find_elements(By.CSS_SELECTOR, "#video-title")
                         if videos:
                             random_video = random.choice(videos[:10])
                             random_video.click()
                             time.sleep(5)
                             logger.info("Watched random video for 5 seconds")
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Could not watch random video: {e}")
                     
                     # Navigate back to target video
                     logger.info("Navigating back to target video")
-                    self.driver.get(self.target_url)
+                    driver.get(self.target_url)
                     time.sleep(random.uniform(3, 5))
             
             logger.info("✅ All cycles completed successfully!")
@@ -259,8 +275,12 @@ class YouTubeBot:
             logger.error(f"Error in cycle: {e}")
             return False
         finally:
-            if self.driver:
-                self.driver.quit()
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            self.driver = None
     
     def run(self):
         """Main run method"""
@@ -279,12 +299,14 @@ def main():
     ╚══════════════════════════════════════════════════════════════╝
     """)
     
-    # Download and setup Chrome profile
+    # Download and setup Chrome profile (optional)
     manager = ChromeProfileManager()
-    if not manager.download_profile_from_drive():
-        print("⚠️ Could not load profile, continuing without it...")
-    else:
+    profile_exists = manager.download_profile_from_drive()
+    
+    if profile_exists:
         print("✅ Chrome profile loaded successfully!")
+    else:
+        print("⚠️ Could not load profile, continuing without it...")
     
     # Initialize and run bot
     bot = YouTubeBot(profile_path=manager.config.local_profile_path)
