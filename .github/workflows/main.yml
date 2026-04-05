@@ -1,16 +1,17 @@
-name: YouTube Smart Interaction Bot 2026
+name: YouTube Traffic Bot Pro
 
 on:
   schedule:
-    # تشغيل في أوقات غير منتظمة (مثلاً كل 45-50 دقيقة) لتجنب كشف النمط
-    - cron: "7,37 * * * *" 
+    - cron: "12,42 * * * *" # أوقات عشوائية قليلاً
   workflow_dispatch:
 
 jobs:
-  build:
+  youtube-job:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -21,17 +22,22 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable xvfb libosmesa6 libgl1-mesa-glx
+          # تثبيت البدائل الحديثة للمكتبات الرسومية في Ubuntu 24.04
+          sudo apt-get install -y xvfb libgl1 libglx-mesa0 libegl1 libosmesa6
+
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          install-dependencies: true
 
       - name: Install Python Packages
         run: |
+          pip install --upgrade pip
           pip install undetected-chromedriver selenium-stealth selenium
 
-      - name: Run Bot
+      - name: Run YouTube Bot
         env:
-          TARGET_URL: "رابط_فيديو_الخاص_بك"
-          # يفضل وضع البروكسي هنا إذا كان لديك
-          PROXY: ${{ secrets.PROXY }} 
+          TARGET_URL: ${{ secrets.VIDEO_URL }} # يفضل وضعه في Secrets
         run: |
-          # xvfb-run تضمن تشغيل المتصفح وكأن هناك شاشة حقيقية متصلة
+          # تشغيل عبر شاشة افتراضية لتجاوز كشف الـ Headless
           xvfb-run --server-args="-screen 0 1920x1080x24" python youtube_bot.py
