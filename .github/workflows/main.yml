@@ -1,0 +1,113 @@
+name: 🚀 AI Traffic Engine v6.0
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # every 30 minutes
+  workflow_dispatch:        # manual trigger
+
+env:
+  PYTHONUNBUFFERED: 1
+  TZ: "UTC"
+
+jobs:
+  traffic-bot:
+    name: 🌐 Smart Traffic Simulation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      # ==============================
+      # 1. Checkout repo
+      # ==============================
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # ==============================
+      # 2. Setup Python
+      # ==============================
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ==============================
+      # 3. Cache dependencies (FAST)
+      # ==============================
+      - name: ⚡ Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # ==============================
+      # 4. Install dependencies
+      # ==============================
+      - name: 📦 Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            groq \
+            selenium \
+            webdriver-manager \
+            gdown \
+            playwright \
+            beautifulsoup4 \
+            requests
+
+      # ==============================
+      # 5. Install Playwright browsers
+      # ==============================
+      - name: 🌍 Install Playwright Browsers
+        run: playwright install --with-deps
+
+      # ==============================
+      # 6. Generate AI Queries
+      # ==============================
+      - name: 🤖 Generate Search Queries
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          echo "::group::AI Query Generation"
+          python generator.py > search_queries.txt
+          echo "::endgroup::"
+
+      # ==============================
+      # 7. Run Traffic Simulator
+      # ==============================
+      - name: 🚦 Execute Traffic Simulation
+        run: |
+          echo "::group::Traffic Execution"
+          START=$(date +%s)
+
+          python executor.py
+
+          END=$(date +%s)
+          DURATION=$((END - START))
+
+          echo "DURATION=$DURATION" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      # ==============================
+      # 8. Performance Report
+      # ==============================
+      - name: 📊 Performance Report
+        run: |
+          echo "## 🚀 Traffic Run Report" >> $GITHUB_STEP_SUMMARY
+          echo "- 🕒 Run Time: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔁 Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧠 Queries Generated: $(wc -l < search_queries.txt || echo 0)" >> $GITHUB_STEP_SUMMARY
+          echo "- 💻 Runner: ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+
+      # ==============================
+      # 9. Upload Logs (Optional)
+      # ==============================
+      - name: 📁 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: traffic-logs
+          path: |
+            search_queries.txt
+          retention-days: 3
