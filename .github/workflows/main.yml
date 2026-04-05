@@ -1,66 +1,37 @@
-import undetected_chromedriver as uc
-from selenium_stealth import stealth
-import time
-import random
-import os
+name: YouTube Smart Interaction Bot 2026
 
-def start_bot():
-    options = uc.ChromeOptions()
-    
-    # إعدادات أساسية لتجنب الكشف
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080')
-    
-    # (اختياري) إضافة بروكسي إذا توفر
-    proxy = os.getenv("PROXY")
-    if proxy:
-        options.add_argument(f'--proxy-server={proxy}')
+on:
+  schedule:
+    # تشغيل في أوقات غير منتظمة (مثلاً كل 45-50 دقيقة) لتجنب كشف النمط
+    - cron: "7,37 * * * *" 
+  workflow_dispatch:
 
-    driver = uc.Chrome(options=options, headless=False) # Headless False لأننا نستخدم xvfb
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    # تطبيق تقنية Stealth لإخفاء بصمة الأتمتة
-    stealth(driver,
-        languages=["en-US", "en"],
-        vendor="Google Inc.",
-        platform="Win32",
-        webgl_vendor="Intel Inc.",
-        renderer="Intel Iris OpenGL Engine",
-        fix_hairline=True,
-    )
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    try:
-        # 1. انتظار عشوائي قبل الدخول (تجنب البداية المتزامنة)
-        initial_wait = random.randint(5, 45)
-        print(f"Waiting {initial_wait}s before starting...")
-        time.sleep(initial_wait)
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable xvfb libosmesa6 libgl1-mesa-glx
 
-        # 2. التوجه للفيديو
-        video_url = os.getenv("TARGET_URL", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        driver.get(video_url)
-        print(f"Watching: {video_url}")
+      - name: Install Python Packages
+        run: |
+          pip install undetected-chromedriver selenium-stealth selenium
 
-        # 3. محاكاة التفاعل البشري (Scroll & Random Movements)
-        watch_duration = random.randint(300, 600) # مشاهدة بين 5 لـ 10 دقائق
-        start_time = time.time()
-        
-        while time.time() - start_time < watch_duration:
-            # التمرير لأسفل (لرؤية التعليقات) ثم للأعلى
-            scroll_amount = random.randint(200, 500)
-            driver.execute_script(f"window.scrollBy(0, {scroll_amount});")
-            time.sleep(random.randint(5, 15))
-            driver.execute_script(f"window.scrollBy(0, -{scroll_amount});")
-            
-            # حركة ماوس عشوائية وهمية
-            print(f"Bot interacting... Time left: {int(watch_duration - (time.time() - start_time))}s")
-            time.sleep(random.randint(20, 40))
-
-        print("Watch session completed successfully.")
-
-    except Exception as e:
-        print(f"Error occurred: {e}")
-    finally:
-        driver.quit()
-
-if __name__ == "__main__":
-    start_bot()
+      - name: Run Bot
+        env:
+          TARGET_URL: "رابط_فيديو_الخاص_بك"
+          # يفضل وضع البروكسي هنا إذا كان لديك
+          PROXY: ${{ secrets.PROXY }} 
+        run: |
+          # xvfb-run تضمن تشغيل المتصفح وكأن هناك شاشة حقيقية متصلة
+          xvfb-run --server-args="-screen 0 1920x1080x24" python youtube_bot.py
