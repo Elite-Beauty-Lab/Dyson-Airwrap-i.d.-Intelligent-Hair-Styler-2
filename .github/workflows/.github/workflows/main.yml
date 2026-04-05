@@ -1,0 +1,150 @@
+name: 🚦 AI-Driven Traffic Pipeline v5.1
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Runs every hour
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'generator.py'
+      - 'executor.py'
+
+env:
+  PYTHONUNBUFFERED: 1
+  TZ: 'UTC'
+
+jobs:
+  traffic-pipeline:
+    name: 🌐 Traffic Generation Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      # ============================================
+      # 1️⃣ Checkout Repository
+      # ============================================
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ============================================
+      # 2️⃣ Setup Python
+      # ============================================
+      - name: 🐍 Setup Python Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      # ============================================
+      # 3️⃣ Install Dependencies
+      # ============================================
+      - name: 📥 Install Dependencies
+        run: |
+          echo "::group::Installing Python Packages"
+          pip install --upgrade pip setuptools wheel
+          pip install groq selenium webdriver-manager gdown playwright beautifulsoup4 requests
+          playwright install chromium --with-deps
+          echo "::endgroup::"
+
+          python -c "import groq; print('✓ Groq SDK installed')"
+          python -c "import selenium; print('✓ Selenium installed')"
+          python -c "import playwright; print('✓ Playwright installed')"
+
+      # ============================================
+      # 4️⃣ AI Query Generation
+      # ============================================
+      - name: 🧠 Generate AI Search Queries
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: "mixtral-8x7b-32768"
+        run: |
+          echo "::group::🤖 AI Query Generation Started"
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "❌ ERROR: GROQ_API_KEY secret not configured"
+            exit 1
+          fi
+
+          if python generator.py 2>&1 | tee ai_output.log; then
+            echo "✅ AI generation completed successfully"
+          else
+            echo "⚠️ AI generator failed, creating fallback queries"
+            cat > search_queries.txt <<EOF
+artificial intelligence trends 2026
+machine learning applications
+deep learning frameworks
+AI automation tools
+python web scraping techniques
+EOF
+          fi
+
+          if [ -f search_queries.txt ]; then
+            QUERY_COUNT=$(wc -l < search_queries.txt)
+            echo "📊 Generated $QUERY_COUNT search queries"
+            head -n 3 search_queries.txt | sed 's/^/  - /'
+          fi
+          echo "::endgroup::"
+
+      # ============================================
+      # 5️⃣ Traffic Simulation
+      # ============================================
+      - name: 🚀 Execute Traffic Simulation
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DISPLAY: ':99'
+          HEADLESS_MODE: 'true'
+        run: |
+          echo "::group::🌐 Traffic Simulation Started"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          timeout 600 python executor.py 2>&1 | tee executor.log
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ Traffic simulation completed successfully"
+          elif [ $EXIT_CODE -eq 124 ]; then
+            echo "⚠️ Traffic simulation timed out"
+          else
+            echo "⚠️ Traffic simulation exited with code: $EXIT_CODE"
+          fi
+
+          if [ -f traffic_stats.json ]; then
+            cat traffic_stats.json | python -m json.tool
+          fi
+          echo "::endgroup::"
+
+      # ============================================
+      # 6️⃣ Performance Report
+      # ============================================
+      - name: 📊 Performance Report
+        if: always()
+        run: |
+          echo "::group::📈 Performance Metrics"
+          free -h
+          df -h /
+          echo "::endgroup::"
+
+      # ============================================
+      # 7️⃣ Archive Artifacts
+      # ============================================
+      - name: 💾 Archive Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traffic-logs-${{ github.run_id }}
+          path: |
+            *.log
+            *.txt
+            *.json
+          retention-days: 7
+
+      # ============================================
+      # 8️⃣ Cleanup
+      # ============================================
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          rm -rf /tmp/playwright* 2>/dev/null || true
+          echo "✅ Cleanup completed"
